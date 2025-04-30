@@ -18,7 +18,9 @@ function parseCsvManually(csvText) {
   const headers = lines[0].split(',').map(h => h.trim());
 
   return lines.slice(1).map(line => {
-    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const values = line.split(',').map(v =>
+      v.trim().replace(/^"|"$/g, '').replace(/\u00A0/g, '')
+    );
     return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
   });
 }
@@ -41,20 +43,20 @@ export default async function handler(req, res) {
     const records = parseCsvManually(csvText);
 
     const filtered = records.filter(row =>
-      allowedSKUs.includes(row.sku) &&
-      micrAllowed(row.class_code, micr) &&
-      yieldAllowed(row.class_code, print_volume.toLowerCase())
+      allowedSKUs.includes(row.sku.trim()) &&
+      micrAllowed(row.class_code.trim(), micr) &&
+      yieldAllowed(row.class_code.trim(), print_volume.toLowerCase())
     );
 
     const results = filtered.length > 0
       ? filtered
-      : records.filter(row => allowedSKUs.includes(row.sku)); // fallback
+      : records.filter(row => allowedSKUs.includes(row.sku.trim())); // fallback
 
-    const final_sku_list = results.map(p => p.sku);
+    const final_sku_list = results.map(p => p.sku.trim());
     const products = results.map(p => ({
-      sku: p.sku,
-      product_url: p.product_url,
-      image_url: p.image_url
+      sku: p.sku.trim(),
+      product_url: p.product_url.trim(),
+      image_url: p.image_url.trim()
     }));
 
     return res.status(200).json({ final_sku_list, products });
