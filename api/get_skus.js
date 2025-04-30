@@ -1,68 +1,71 @@
-const CSV_URL = 'https://eandssolutions-my.sharepoint.com/:x:/p/ianelliott/Ea7VC-02OP9CgxcJH8DbZ_YBViSpmmpQ1F8TDwhNmdeXjQ?download=1';
-
-function micrAllowed(code, micr) {
-  const hasM = code.toUpperCase().includes('M');
-  return micr === 'MICR' ? hasM : !hasM;
-}
-
-function yieldAllowed(code, volume) {
-  const upper = code.toUpperCase();
-  if (volume === 'low') return !upper.includes('HY') && !upper.includes('J');
-  if (volume === 'medium') return upper.includes('J') && !upper.includes('HY');
-  if (volume === 'high') return upper.includes('HY') || upper.includes('J');
-  return false;
-}
-
-function parseCsvManually(csvText) {
-  const lines = csvText.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim());
-
-  return lines.slice(1).map(line => {
-    const values = line.split(',').map(v =>
-      v.trim().replace(/^"|"$/g, '').replace(/\u00A0/g, '')
-    );
-    return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
-  });
-}
+const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
 export default async function handler(req, res) {
-  const { sku_list, print_volume = '', micr = '' } = req.query;
+  const { sku_list, print_volume, micr } = req.query;
 
-  if (!sku_list || !print_volume) {
-    return res.status(400).json({ error: 'Missing one or more required parameters.' });
+  if (!sku_list) {
+    return res.status(400).json({ error: 'Missing sku_list' });
+  }
+
+  let parsedSkuList;
+  try {
+    parsedSkuList = JSON.parse(sku_list);
+  } catch {
+    return res.status(400).json({ error: 'Invalid sku_list format — must be JSON array' });
   }
 
   try {
-    const allowedSKUs = Array.isArray(sku_list)
-      ? sku_list
-      : JSON.parse(sku_list);
-
     const response = await fetch(CSV_URL);
     const csvText = await response.text();
+    const lines = csvText.trim().split(/\r?\n/);
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
 
-    const records = parseCsvManually(csvText);
+    const rows = lines.slice(1).map(line => {
+      const values = line.split(',').map(v =>
+        v.trim().replace(/^"|"$/g, '').replace(/\u00A0/g, '')
+      );
+      return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
+    });
 
-    const filtered = records.filter(row =>
-      allowedSKUs.includes(row.sku.trim()) &&
-      micrAllowed(row.class_code.trim(), micr) &&
-      yieldAllowed(row.class_code.trim(), print_volume.toLowerCase())
-    );
+    // Filter to just SKUs provided
+    let candidates = rows.filter(row => parsedSkuList.includes(row.sku));
 
-    const results = filtered.length > 0
-      ? filtered
-      : records.filter(row => allowedSKUs.includes(row.sku.trim())); // fallback
+    // MICR Filtering
+    if (micr?.toUpperCase() === 'MICR') {
+      candidates = candidates.filter(r => r.class_code.includes('M'));
+    } else {
+      candidates = candidates.filter(r => !r.class_code.includes('M'));
+    }
 
-    const final_sku_list = results.map(p => p.sku.trim());
-    const products = results.map(p => ({
-      sku: p.sku.trim(),
-      product_url: p.product_url.trim(),
-      image_url: p.image_url.trim()
+    // Page Yield Filtering
+    const pv = print_volume?.toLowerCase();
+    if (pv === 'low') {
+      candidates = candidates.filter(r => !r.class_code.includes('HY') && !r.class_code.includes('J'));
+    } else if (pv === 'medium') {
+      candidates = candidates.filter(r =>
+        !r.class_code.includes('HY') || r.class_code.includes('J')
+      );
+    } else if (pv === 'high') {
+      candidates = candidates.filter(r =>
+        r.class_code.includes('HY') || r.class_code.includes('J')
+      );
+    }
+
+    // Always return something — best fallback is first valid result
+    const final_sku_list = candidates.map(r => r.sku);
+    const products = candidates.map(r => ({
+      sku: r.sku,
+      product_url: r.product_url,
+      image_url: r.image_url,
     }));
 
-    return res.status(200).json({ final_sku_list, products });
+    return res.status(200).json({
+      final_sku_list,
+      products
+    });
 
   } catch (err) {
     console.error('Error:', err);
-    return res.status(500).json({ error: 'Server error processing SKU list.' });
+    return res.status(500).json({ error: 'Failed to fetch or process CSV' });
   }
 }
