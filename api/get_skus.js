@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import { parse } from 'csv-parse/sync';
 
 const CSV_URL = 'https://eandssolutions-my.sharepoint.com/:x:/p/ianelliott/Ea7VC-02OP9CgxcJH8DbZ_YBViSpmmpQ1F8TDwhNmdeXjQ?download=1';
