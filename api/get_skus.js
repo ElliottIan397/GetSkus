@@ -1,5 +1,3 @@
-import { parse } from 'csv-parse/sync';
-
 const CSV_URL = 'https://eandssolutions-my.sharepoint.com/:x:/p/ianelliott/Ea7VC-02OP9CgxcJH8DbZ_YBViSpmmpQ1F8TDwhNmdeXjQ?download=1';
 
 function micrAllowed(code, micr) {
@@ -13,6 +11,16 @@ function yieldAllowed(code, volume) {
   if (volume === 'medium') return upper.includes('J') && !upper.includes('HY');
   if (volume === 'high') return upper.includes('HY') || upper.includes('J');
   return false;
+}
+
+function parseCsvManually(csvText) {
+  const lines = csvText.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+
+  return lines.slice(1).map(line => {
+    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
+  });
 }
 
 export default async function handler(req, res) {
@@ -30,11 +38,7 @@ export default async function handler(req, res) {
     const response = await fetch(CSV_URL);
     const csvText = await response.text();
 
-    const records = parse(csvText, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    });
+    const records = parseCsvManually(csvText);
 
     const filtered = records.filter(row =>
       allowedSKUs.includes(row.sku) &&
@@ -56,7 +60,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ final_sku_list, products });
 
   } catch (err) {
-    console.error('CSV fetch/parse error:', err);
+    console.error('Error:', err);
     return res.status(500).json({ error: 'Server error processing SKU list.' });
   }
 }
