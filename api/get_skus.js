@@ -27,17 +27,14 @@ export default async function handler(req, res) {
       return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
     });
 
-    // Filter to just SKUs provided
     let candidates = rows.filter(row => parsedSkuList.includes(row.sku));
 
-    // MICR Filtering
     if (micr?.toUpperCase() === 'MICR') {
       candidates = candidates.filter(r => r.class_code.includes('M'));
     } else {
       candidates = candidates.filter(r => !r.class_code.includes('M'));
     }
 
-    // Page Yield Filtering
     const pv = print_volume?.toLowerCase();
     if (pv === 'low') {
       candidates = candidates.filter(r => !r.class_code.includes('HY') && !r.class_code.includes('J'));
@@ -51,18 +48,9 @@ export default async function handler(req, res) {
       );
     }
 
-    // Always return something — best fallback is first valid result
     const final_sku_list = candidates.map(r => r.sku);
-    const products = candidates.map(r => ({
-      sku: r.sku,
-      product_url: r.product_url,
-      image_url: r.image_url,
-    }));
 
-    return res.status(200).json({
-      final_sku_list,
-      products
-    });
+    return res.status(200).json({ final_sku_list });
 
   } catch (err) {
     console.error('Error:', err);
