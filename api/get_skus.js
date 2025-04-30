@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { parse } from 'csv-parse/sync';
 
-const CSV_URL = 'YOUR_ONEDRIVE_LINK_HERE?download=1'; // Replace with your CSV link
+const CSV_URL = 'https://eandssolutions-my.sharepoint.com/:x:/p/ianelliott/Ea7VC-02OP9CgxcJH8DbZ_YBViSpmmpQ1F8TDwhNmdeXjQ?download=1';
 
 function micrAllowed(code, micr) {
   const hasM = code.toUpperCase().includes('M');
