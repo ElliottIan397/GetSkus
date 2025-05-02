@@ -1,15 +1,18 @@
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
 export default async function handler(req, res) {
-  const { sku_list, print_volume, micr } = req.query;
+  // Accept fallback casings for Voiceflow params
+  const micr = req.query.micr || req.query.Micr || '';
+  const print_volume = req.query.print_volume || req.query.PrintVolume || '';
+  const rawSkuList = req.query.sku_list || req.query.skuList || req.query.Sku_List;
 
-  if (!sku_list) {
+  if (!rawSkuList) {
     return res.status(400).json({ error: 'Missing sku_list' });
   }
 
   let parsedSkuList;
   try {
-    parsedSkuList = JSON.parse(sku_list);
+    parsedSkuList = JSON.parse(rawSkuList);
   } catch {
     return res.status(400).json({ error: 'Invalid sku_list format — must be JSON array' });
   }
@@ -29,13 +32,13 @@ export default async function handler(req, res) {
 
     let candidates = rows.filter(row => parsedSkuList.includes(row.sku));
 
-    if (micr?.toUpperCase() === 'MICR') {
+    if (micr.toUpperCase() === 'MICR') {
       candidates = candidates.filter(r => r.class_code.includes('M'));
     } else {
       candidates = candidates.filter(r => !r.class_code.includes('M'));
     }
 
-    const pv = print_volume?.toLowerCase();
+    const pv = print_volume.toLowerCase();
     if (pv === 'low') {
       candidates = candidates.filter(r => !r.class_code.includes('HY') && !r.class_code.includes('J'));
     } else if (pv === 'medium') {
