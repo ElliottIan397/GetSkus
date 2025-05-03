@@ -1,26 +1,34 @@
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
 export default async function handler(req, res) {
-  const { sku_list, print_volume, micr } = req.query;
+  let { sku_list, print_volume, micr } = req.query;
 
-  // 🔍 Log what VF is actually sending
-  console.log('INBOUND VF REQUEST:', {
-    raw: req.url,
-    sku_list,
-    print_volume,
-    micr
-  });
-  
+  // --- Parse SKU list
   if (!sku_list) {
     return res.status(400).json({ error: 'Missing sku_list' });
   }
 
-  let parsedSkuList;
   try {
-    parsedSkuList = JSON.parse(sku_list);
+    sku_list = JSON.parse(sku_list);
   } catch {
     return res.status(400).json({ error: 'Invalid sku_list format — must be JSON array' });
   }
+
+  // --- Normalize string inputs from Voiceflow
+  if (typeof print_volume === 'string') {
+    print_volume = print_volume.replace(/^"|"$/g, '').trim().toLowerCase();
+  }
+
+  if (typeof micr === 'string') {
+    micr = micr.replace(/^"|"$/g, '').trim().toUpperCase();
+  }
+
+  // 🔍 Log the cleaned parameters for debugging
+  console.log('CLEANED INPUTS:', {
+    sku_list,
+    print_volume,
+    micr
+  });
 
   try {
     const response = await fetch(CSV_URL);
@@ -35,22 +43,21 @@ export default async function handler(req, res) {
       return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
     });
 
-    let candidates = rows.filter(row => parsedSkuList.includes(row.sku));
+    let candidates = rows.filter(row => sku_list.includes(row.sku));
 
-    if (micr?.toUpperCase() === 'MICR') {
+    if (micr === 'MICR') {
       candidates = candidates.filter(r => r.class_code.includes('M'));
     } else {
       candidates = candidates.filter(r => !r.class_code.includes('M'));
     }
 
-    const pv = print_volume?.toLowerCase();
-    if (pv === 'low') {
+    if (print_volume === 'low') {
       candidates = candidates.filter(r => !r.class_code.includes('HY') && !r.class_code.includes('J'));
-    } else if (pv === 'medium') {
+    } else if (print_volume === 'medium') {
       candidates = candidates.filter(r =>
         !r.class_code.includes('HY') || r.class_code.includes('J')
       );
-    } else if (pv === 'high') {
+    } else if (print_volume === 'high') {
       candidates = candidates.filter(r =>
         r.class_code.includes('HY') || r.class_code.includes('J')
       );
