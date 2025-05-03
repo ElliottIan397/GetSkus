@@ -3,6 +3,14 @@ const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main
 export default async function handler(req, res) {
   const { sku_list, print_volume, micr } = req.query;
 
+  // 🔍 Log what VF is actually sending
+  console.log('INBOUND VF REQUEST:', {
+    raw: req.url,
+    sku_list,
+    print_volume,
+    micr
+  });
+  
   if (!sku_list) {
     return res.status(400).json({ error: 'Missing sku_list' });
   }
