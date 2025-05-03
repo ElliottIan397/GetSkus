@@ -1,7 +1,7 @@
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
 export default async function handler(req, res) {
-  let { sku_list, print_volume, micr } = req.query;
+  let { sku_list, PrintVolume, micr } = req.query;
 
   // --- Parse SKU list
   if (!sku_list) {
@@ -15,8 +15,8 @@ export default async function handler(req, res) {
   }
 
   // --- Normalize string inputs from Voiceflow
-  if (typeof print_volume === 'string') {
-    print_volume = print_volume.replace(/^"|"$/g, '').trim().toLowerCase();
+  if (typeof PrintVolume === 'string') {
+    PrintVolume = PrintVolume.replace(/^"|"$/g, '').trim().toLowerCase();
   }
 
   if (typeof micr === 'string') {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   // 🔍 Log the cleaned parameters for debugging
   console.log('CLEANED INPUTS:', {
     sku_list,
-    print_volume,
+    PrintVolume,
     micr
   });
 
@@ -51,13 +51,13 @@ export default async function handler(req, res) {
       candidates = candidates.filter(r => !r.class_code.includes('M'));
     }
 
-    if (print_volume === 'low') {
+    if (PrintVolume === 'low') {
       candidates = candidates.filter(r => !r.class_code.includes('HY') && !r.class_code.includes('J'));
-    } else if (print_volume === 'medium') {
+    } else if (PrintVolume === 'medium') {
       candidates = candidates.filter(r =>
         !r.class_code.includes('HY') || r.class_code.includes('J')
       );
-    } else if (print_volume === 'high') {
+    } else if (PrintVolume === 'high') {
       candidates = candidates.filter(r =>
         r.class_code.includes('HY') || r.class_code.includes('J')
       );
