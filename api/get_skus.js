@@ -66,7 +66,7 @@ export default async function handler(req, res) {
       );
     }
 
-    const final_sku_list = candidates.map(r => r.sku);
+    const final_sku_list = candidates.length > 0 ? [candidates[0].sku] : [];
 
     return res.status(200).json({ final_sku_list });
   } catch (err) {
