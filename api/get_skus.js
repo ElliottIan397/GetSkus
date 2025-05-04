@@ -52,6 +52,14 @@ export default async function handler(req, res) {
     candidates.sort((a, b) => getYieldRank(a.class_code) - getYieldRank(b.class_code));
     const final_sku_list = candidates.length > 0 ? [candidates[0].sku] : [];
 
+    console.log("🔍 VF API OUTPUT:", {
+      incoming_skus: sku_list,
+      print_volume: PrintVolume,
+      micr: micr,
+      filtered_candidates: candidates.map(c => ({ sku: c.sku, class_code: c.class_code })),
+      final_sku_list: final_sku_list
+    });
+
     return res.status(200).json({ final_sku_list });
 
   } catch (err) {
