@@ -6,12 +6,14 @@ export default async function handler(req, res) {
   console.log("INBOUND VF REQUEST:", req.query);
 
   try {
-    sku_list = JSON.parse(sku_list);
-    PrintVolume = PrintVolume?.replace(/^"|"$/g, '').toLowerCase();
-    micr = micr?.replace(/^"|"$/g, '').toUpperCase();
-  } catch {
-    return res.status(400).json({ error: 'Bad input format' });
-  }
+  sku_list = JSON.parse(sku_list);
+
+  // Fix potential double quotes in Voiceflow inputs
+  PrintVolume = (PrintVolume || "").replace(/^"+|"+$/g, '').toLowerCase();
+  micr = (micr || "").replace(/^"+|"+$/g, '').toUpperCase();
+} catch {
+  return res.status(400).json({ error: 'Bad input format' });
+}
 
   try {
     const response = await fetch(CSV_URL);
