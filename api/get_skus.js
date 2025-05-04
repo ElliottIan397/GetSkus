@@ -1,76 +1,61 @@
-// get_skus.js - Updated filtering logic for MICR and PrintVolume
-
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
 export default async function handler(req, res) {
   let { sku_list, PrintVolume, micr } = req.query;
 
-  if (!sku_list) {
-    return res.status(400).json({ error: 'Missing sku_list' });
-  }
+  console.log("INBOUND VF REQUEST:", req.query);
 
   try {
     sku_list = JSON.parse(sku_list);
+    PrintVolume = PrintVolume?.replace(/^"|"$/g, '').toLowerCase();
+    micr = micr?.replace(/^"|"$/g, '').toUpperCase();
   } catch {
-    return res.status(400).json({ error: 'Invalid sku_list format — must be JSON array' });
+    return res.status(400).json({ error: 'Bad input format' });
   }
-
-  // Normalize input strings
-  if (typeof PrintVolume === 'string') {
-    PrintVolume = PrintVolume.replace(/^"|"$/g, '').trim().toLowerCase();
-  }
-  if (typeof micr === 'string') {
-    micr = micr.replace(/^"|"$/g, '').trim().toUpperCase();
-  }
-
-  // Debug log
-  console.log('CLEANED INPUTS:', { sku_list, PrintVolume, micr });
 
   try {
     const response = await fetch(CSV_URL);
     const csvText = await response.text();
-    const lines = csvText.trim().split(/\r?\n/);
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    const [headerLine, ...lines] = csvText.trim().split(/\r?\n/);
+    const headers = headerLine.split(',').map(h => h.trim());
 
-    const rows = lines.slice(1).map(line => {
-      const values = line.split(',').map(v =>
-        v.trim().replace(/^"|"$/g, '').replace(/\u00A0/g, '')
-      );
-      return Object.fromEntries(headers.map((h, i) => [h, values[i] || ""]));
+    const rows = lines.map(line => {
+      const values = line.split(',');
+      return Object.fromEntries(headers.map((h, i) => [h, values[i]?.trim() || ""]));
     });
 
-    let candidates = rows.filter(row => sku_list.includes(row.sku));
+    let candidates = rows.filter(r => sku_list.includes(r.sku));
 
-    // --- MICR filtering ---
     if (micr === 'MICR') {
-      candidates = candidates.filter(r => r.class_code.toUpperCase().includes('M'));
+      candidates = candidates.filter(r => r.class_code.includes('M'));
     } else {
-      candidates = candidates.filter(r => !r.class_code.toUpperCase().includes('M'));
+      candidates = candidates.filter(r => !r.class_code.includes('M'));
     }
 
-    // --- PrintVolume filtering ---
     if (PrintVolume === 'low') {
-      candidates = candidates.filter(r =>
-        !r.class_code.toUpperCase().includes('HY') &&
-        !r.class_code.toUpperCase().includes('J')
-      );
+      candidates = candidates.filter(r => !r.class_code.includes('HY') && !r.class_code.includes('J'));
     } else if (PrintVolume === 'medium') {
-      // Medium allows all except HYJ, HYJ2, etc. (keep standard + jumbo)
-      candidates = candidates.filter(r =>
-        !r.class_code.toUpperCase().includes('HYJ')
-      );
+      candidates = candidates.filter(r => !r.class_code.includes('J'));
     } else if (PrintVolume === 'high') {
-      candidates = candidates.filter(r =>
-        r.class_code.toUpperCase().includes('HY') ||
-        r.class_code.toUpperCase().includes('J')
-      );
+      candidates = candidates.filter(r => r.class_code.includes('HY') || r.class_code.includes('J'));
     }
 
+    // --- Yield prioritization logic
+    const yieldPreference = ['HYJ', 'HY', 'J', ''];
+    const getYieldRank = code => {
+      if (code.includes('HYJ')) return 0;
+      if (code.includes('HY')) return 1;
+      if (code.includes('J')) return 2;
+      return 3;
+    };
+
+    candidates.sort((a, b) => getYieldRank(a.class_code) - getYieldRank(b.class_code));
     const final_sku_list = candidates.length > 0 ? [candidates[0].sku] : [];
 
     return res.status(200).json({ final_sku_list });
+
   } catch (err) {
-    console.error('Error:', err);
-    return res.status(500).json({ error: 'Failed to fetch or process CSV' });
+    console.error('Processing error:', err);
+    return res.status(500).json({ error: 'CSV fetch or parse failed' });
   }
 }
