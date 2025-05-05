@@ -6,14 +6,14 @@ export default async function handler(req, res) {
   console.log("INBOUND VF REQUEST:", req.query);
 
   try {
-  sku_list = JSON.parse(sku_list);
+    sku_list = JSON.parse(sku_list);
 
-  // Fix potential double quotes in Voiceflow inputs
-  PrintVolume = (PrintVolume || "").replace(/^"+|"+$/g, '').toLowerCase();
-  micr = (micr || "").replace(/^"+|"+$/g, '').toUpperCase();
-} catch {
-  return res.status(400).json({ error: 'Bad input format' });
-}
+    // Fix potential double quotes in Voiceflow inputs
+    PrintVolume = (PrintVolume || "").replace(/^"+|"+$/g, '').toLowerCase();
+    micr = (micr || "").replace(/^"+|"+$/g, '').toUpperCase();
+  } catch {
+    return res.status(400).json({ error: 'Bad input format' });
+  }
 
   try {
     const response = await fetch(CSV_URL);
@@ -29,32 +29,42 @@ export default async function handler(req, res) {
     let candidates = rows.filter(r => sku_list.includes(r.sku));
 
     if (micr === 'MICR') {
-      candidates = candidates.filter(r => r.class_code.includes('M'));
+      candidates = candidates.filter(r => r.class_code.toUpperCase().includes('M'));
     } else {
-      candidates = candidates.filter(r => !r.class_code.includes('M'));
+      candidates = candidates.filter(r => !r.class_code.toUpperCase().includes('M'));
     }
 
     if (PrintVolume === 'low') {
-      candidates = candidates.filter(r => !r.class_code.includes('HY') && !r.class_code.includes('J'));
+      candidates = candidates.filter(r => {
+        const cc = r.class_code.toUpperCase().slice(1); // drop build style
+        return !cc.includes('HY') && !cc.includes('J') && !cc.includes('M');
+      });
     } else if (PrintVolume === 'medium') {
-      candidates = candidates.filter(r => !r.class_code.includes('J'));
+      candidates = candidates.filter(r => {
+        const cc = r.class_code.toUpperCase().slice(1);
+        return !cc.includes('J') && !cc.includes('M');
+      });
     } else if (PrintVolume === 'high') {
-      candidates = candidates.filter(r => r.class_code.includes('HY') || r.class_code.includes('J'));
+      candidates = candidates.filter(r => {
+        const cc = r.class_code.toUpperCase().slice(1);
+        return (cc.includes('HY') || cc.includes('J')) && !cc.includes('M');
+      });
     }
 
     // --- Yield prioritization logic
     const yieldPreference = ['HYJ', 'HY', 'J', ''];
     const getYieldRank = code => {
-      if (code.includes('HYJ')) return 0;
-      if (code.includes('HY')) return 1;
-      if (code.includes('J')) return 2;
+      const cc = code.toUpperCase().slice(1);
+      if (cc.includes('HY') && cc.includes('J')) return 0;
+      if (cc.includes('HY')) return 1;
+      if (cc.includes('J')) return 2;
       return 3;
     };
 
     candidates.sort((a, b) => getYieldRank(a.class_code) - getYieldRank(b.class_code));
     const final_sku_list = candidates.length > 0 ? [candidates[0].sku] : [];
 
-    console.log("🔍 VF API OUTPUT:", {
+    console.log("\uD83D\uDD0D VF API OUTPUT:", {
       incoming_skus: sku_list,
       PrintVolume: PrintVolume,
       micr: micr,
