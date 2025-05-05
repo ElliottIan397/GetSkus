@@ -28,38 +28,37 @@ export default async function handler(req, res) {
 
     let candidates = rows.filter(r => sku_list.includes(r.sku));
 
+    // Yield prioritization logic for all SKUs
+    const getYieldRank = code => {
+      const cc = code.toUpperCase().slice(1); // ignore build style
+      if (cc.includes('HY') && cc.includes('J')) return 3;
+      if (cc.includes('HY')) return 2;
+      if (cc.includes('J')) return 1;
+      return 0; // STD yield
+    };
+
     if (micr === 'MICR') {
       candidates = candidates.filter(r => r.class_code.toUpperCase().includes('M'));
     } else {
       candidates = candidates.filter(r => !r.class_code.toUpperCase().includes('M'));
-    }
 
-    if (PrintVolume === 'low') {
-      candidates = candidates.filter(r => {
-        const cc = r.class_code.toUpperCase().slice(1); // drop build style
-        return !cc.includes('HY') && !cc.includes('J') && !cc.includes('M');
-      });
-    } else if (PrintVolume === 'medium') {
-      candidates = candidates.filter(r => {
-        const cc = r.class_code.toUpperCase().slice(1);
-        return !cc.includes('J') && !cc.includes('M');
-      });
-    } else if (PrintVolume === 'high') {
-      candidates = candidates.filter(r => {
-        const cc = r.class_code.toUpperCase().slice(1);
-        return (cc.includes('HY') || cc.includes('J')) && !cc.includes('M');
-      });
+      if (PrintVolume === 'low') {
+        candidates = candidates.filter(r => {
+          const cc = r.class_code.toUpperCase().slice(1);
+          return !cc.includes('HY') && !cc.includes('J');
+        });
+      } else if (PrintVolume === 'medium') {
+        candidates = candidates.filter(r => {
+          const cc = r.class_code.toUpperCase().slice(1);
+          return !cc.includes('J');
+        });
+      } else if (PrintVolume === 'high') {
+        candidates = candidates.filter(r => {
+          const cc = r.class_code.toUpperCase().slice(1);
+          return cc.includes('HY') || cc.includes('J');
+        });
+      }
     }
-
-    // --- Yield prioritization logic
-    const yieldPreference = ['HYJ', 'HY', 'J', ''];
-    const getYieldRank = code => {
-      const cc = code.toUpperCase().slice(1);
-      if (cc.includes('HY') && cc.includes('J')) return 0;
-      if (cc.includes('HY')) return 1;
-      if (cc.includes('J')) return 2;
-      return 3;
-    };
 
     candidates.sort((a, b) => getYieldRank(a.class_code) - getYieldRank(b.class_code));
     const final_sku_list = candidates.length > 0 ? [candidates[0].sku] : [];
