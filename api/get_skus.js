@@ -1,3 +1,4 @@
+// Revision: v1.3.1 - Prioritizes HY for high-volume, includes fallback support for all PrintVolume levels
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
 export default async function handler(req, res) {
@@ -79,12 +80,17 @@ export default async function handler(req, res) {
 
         if (filtered.length > 0) {
           candidates = filtered;
+        } else {
+          // fallback: prefer HY over STD if HY is available
+          const hyOnly = candidates.filter(r => r.class_code.toUpperCase().slice(1).includes('HY'));
+          if (hyOnly.length > 0) {
+            candidates = hyOnly;
+          }
         }
-        // else fallback: use all non-MICR candidates
       }
     }
 
-    candidates.sort((a, b) => getYieldRank(a.class_code) - getYieldRank(b.class_code));
+    candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code)); // descending to prioritize high yield
     const final_sku_list = candidates.length > 0 ? [candidates[0].sku] : [];
 
     console.log("\uD83D\uDD0D VF API OUTPUT:", {
