@@ -43,20 +43,44 @@ export default async function handler(req, res) {
       candidates = candidates.filter(r => !r.class_code.toUpperCase().includes('M'));
 
       if (PrintVolume === 'low') {
-        candidates = candidates.filter(r => {
+        const std = candidates.filter(r => {
           const cc = r.class_code.toUpperCase().slice(1);
           return !cc.includes('HY') && !cc.includes('J');
         });
+
+        const nj = candidates.filter(r => {
+          const cc = r.class_code.toUpperCase().slice(1);
+          return cc === 'J';
+        });
+
+        if (std.length > 0) {
+          candidates = std;
+        } else if (nj.length > 0) {
+          candidates = nj;
+        }
+        // else: use full list as fallback
+
       } else if (PrintVolume === 'medium') {
-        candidates = candidates.filter(r => {
+        const filtered = candidates.filter(r => {
           const cc = r.class_code.toUpperCase().slice(1);
           return !cc.includes('J');
         });
+
+        if (filtered.length > 0) {
+          candidates = filtered;
+        }
+        // else fallback: use all non-MICR candidates
+
       } else if (PrintVolume === 'high') {
-        candidates = candidates.filter(r => {
+        const filtered = candidates.filter(r => {
           const cc = r.class_code.toUpperCase().slice(1);
           return cc.includes('HY') || cc.includes('J');
         });
+
+        if (filtered.length > 0) {
+          candidates = filtered;
+        }
+        // else fallback: use all non-MICR candidates
       }
     }
 
