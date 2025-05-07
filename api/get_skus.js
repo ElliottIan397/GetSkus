@@ -1,4 +1,9 @@
-// Revision: v1.3.1 - Prioritizes HY for high-volume, includes fallback support for all PrintVolume levels
+// Revision: v1.3.2
+// CHANGELOG:
+// - Prioritize HY for high-volume print
+// - Add fallback logic for all PrintVolume levels
+// - Prefer first SKU in list (assumed black cartridge) when multiple equal candidates
+
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
 export default async function handler(req, res) {
@@ -88,6 +93,15 @@ export default async function handler(req, res) {
           }
         }
       }
+    }
+
+    // Prefer black cartridge if it's in the list
+    const blackSku = sku_list[0];
+    if (candidates.some(c => c.sku === blackSku)) {
+      candidates = [
+        ...candidates.filter(c => c.sku === blackSku),
+        ...candidates.filter(c => c.sku !== blackSku)
+      ];
     }
 
     candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code)); // descending to prioritize high yield
