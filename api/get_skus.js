@@ -1,8 +1,7 @@
-// Revision: v1.3.3
+// Revision: v1.3.4
 // CHANGELOG:
-// - Prioritize HY for high-volume print
-// - Add fallback logic for all PrintVolume levels
-// - Ensure final selection prefers first SKU (black cartridge) even after sorting
+// - Combined STD and NJ fallback for PrintVolume = 'low' to improve black cartridge inclusion
+// - Retains black SKU prioritization and yield sorting
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -59,10 +58,9 @@ export default async function handler(req, res) {
           return cc === 'J';
         });
 
-        if (std.length > 0) {
-          candidates = std;
-        } else if (nj.length > 0) {
-          candidates = nj;
+        const combined = [...std, ...nj];
+        if (combined.length > 0) {
+          candidates = combined;
         }
         // else: use full list as fallback
 
