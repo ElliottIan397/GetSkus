@@ -1,7 +1,7 @@
-// Revision: v1.3.4
+// Revision: v1.3.5
 // CHANGELOG:
-// - Combined STD and NJ fallback for PrintVolume = 'low' to improve black cartridge inclusion
-// - Retains black SKU prioritization and yield sorting
+// - Black SKU prioritization now limited to PrintVolume = 'low' or 'medium'
+// - Prevents overriding HY preference in high-volume cases
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -95,9 +95,9 @@ export default async function handler(req, res) {
 
     candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code)); // descending to prioritize high yield
 
-    // Ensure preferred black cartridge (first SKU) stays first if present
+    // Ensure preferred black cartridge (first SKU) stays first if present in low or medium volume
     const blackSku = sku_list[0];
-    if (candidates.some(c => c.sku === blackSku)) {
+    if ((PrintVolume === 'low' || PrintVolume === 'medium') && candidates.some(c => c.sku === blackSku)) {
       candidates = [
         ...candidates.filter(c => c.sku === blackSku),
         ...candidates.filter(c => c.sku !== blackSku)
