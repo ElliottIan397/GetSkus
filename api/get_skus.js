@@ -1,7 +1,7 @@
-// Revision: v1.3.5
+// Revision: v1.3.6
 // CHANGELOG:
-// - Black SKU prioritization now limited to PrintVolume = 'low' or 'medium'
-// - Prevents overriding HY preference in high-volume cases
+// - Implemented fallback logic for yield class filtering based on PrintVolume and MICR
+// - Preserved color cartridge handling and black SKU prioritization
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -12,8 +12,6 @@ export default async function handler(req, res) {
 
   try {
     sku_list = JSON.parse(sku_list);
-
-    // Fix potential double quotes in Voiceflow inputs
     PrintVolume = (PrintVolume || "").replace(/^"+|"+$/g, '').toLowerCase();
     micr = (micr || "").replace(/^"+|"+$/g, '').toUpperCase();
   } catch {
@@ -33,69 +31,49 @@ export default async function handler(req, res) {
 
     let candidates = rows.filter(r => sku_list.includes(r.sku));
 
-    // Yield prioritization logic for all SKUs
     const getYieldRank = code => {
-      const cc = code.toUpperCase().slice(1); // ignore build style
+      const cc = code.toUpperCase().slice(1);
       if (cc.includes('HY') && cc.includes('J')) return 3;
       if (cc.includes('HY')) return 2;
       if (cc.includes('J')) return 1;
-      return 0; // STD yield
+      return 0;
     };
 
-    if (micr === 'MICR') {
-      candidates = candidates.filter(r => r.class_code.toUpperCase().includes('M'));
-    } else {
-      candidates = candidates.filter(r => !r.class_code.toUpperCase().includes('M'));
+    // Apply MICR filter
+    const isMicr = micr === 'MICR';
+    candidates = candidates.filter(r =>
+      isMicr ? r.class_code.toUpperCase().includes('M') :
+               !r.class_code.toUpperCase().includes('M')
+    );
 
-      if (PrintVolume === 'low') {
-        const std = candidates.filter(r => {
-          const cc = r.class_code.toUpperCase().slice(1);
-          return !cc.includes('HY') && !cc.includes('J');
-        });
+    // Fallback yield preference map
+    const fallbackMap = {
+      "low|":      ["", "J", "HY", "HYJ"],
+      "med|":      ["J", "HY", "", "HYJ"],
+      "high|":     ["HY", "HYJ", "J", ""],
+      "low|MICR":  ["M", "JM", "HYM", "HYJM"],
+      "med|MICR":  ["JM", "HYM", "HYJM", "M"],
+      "high|MICR": ["HYM", "HYJM", "JM", "M"]
+    };
 
-        const nj = candidates.filter(r => {
-          const cc = r.class_code.toUpperCase().slice(1);
-          return cc === 'J';
-        });
+    const fallbackKey = `${PrintVolume}|${isMicr ? 'MICR' : ''}`;
+    const preferences = fallbackMap[fallbackKey] || [];
 
-        const combined = [...std, ...nj];
-        if (combined.length > 0) {
-          candidates = combined;
-        }
-        // else: use full list as fallback
-
-      } else if (PrintVolume === 'medium') {
-        const filtered = candidates.filter(r => {
-          const cc = r.class_code.toUpperCase().slice(1);
-          return !cc.includes('J');
-        });
-
-        if (filtered.length > 0) {
-          candidates = filtered;
-        }
-        // else fallback: use all non-MICR candidates
-
-      } else if (PrintVolume === 'high') {
-        const filtered = candidates.filter(r => {
-          const cc = r.class_code.toUpperCase().slice(1);
-          return cc.includes('HY') || cc.includes('J');
-        });
-
-        if (filtered.length > 0) {
-          candidates = filtered;
-        } else {
-          // fallback: prefer HY over STD if HY is available
-          const hyOnly = candidates.filter(r => r.class_code.toUpperCase().slice(1).includes('HY'));
-          if (hyOnly.length > 0) {
-            candidates = hyOnly;
-          }
-        }
-      }
+    let filtered = [];
+    for (const pref of preferences) {
+      filtered = candidates.filter(r => {
+        const cc = r.class_code.toUpperCase().slice(1);
+        return cc === pref;
+      });
+      if (filtered.length > 0) break;
     }
+    if (filtered.length === 0) {
+      filtered = candidates;
+    }
+    candidates = filtered;
 
-    candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code)); // descending to prioritize high yield
+    candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code));
 
-    // Ensure preferred black cartridge (first SKU) stays first if present in low or medium volume
     const blackSku = sku_list[0];
     if ((PrintVolume === 'low' || PrintVolume === 'medium') && candidates.some(c => c.sku === blackSku)) {
       candidates = [
@@ -121,3 +99,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'CSV fetch or parse failed' });
   }
 }
+
