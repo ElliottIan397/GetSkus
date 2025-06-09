@@ -1,7 +1,8 @@
-// Revision: v1.3.9
+// Revision: v1.4.0
 // CHANGELOG:
-// - Re-introduced conditional yield-based sorting for color cartridge handling
-// - Preserves fallback priority when yield type is unambiguous
+// - Corrected fallback match logic to ensure exact preference match
+// - Prevented overmatching in fallback filtering
+// - Maintained yield-based sorting only when yield types differ
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -57,13 +58,14 @@ export default async function handler(req, res) {
     const fallbackKey = `${PrintVolume}|${isMicr ? 'MICR' : ''}`;
     const preferences = fallbackMap[fallbackKey] || [];
 
+    const fallbackMatch = (cc, pref) => {
+      if (pref === "") return !cc.includes("HY") && !cc.includes("J") && !cc.includes("M");
+      return cc === pref;
+    };
+
     let filtered = [];
     for (const pref of preferences) {
-      const match = candidates.filter(r => {
-        const cc = r.class_code.toUpperCase().slice(1);
-        if (pref === "") return !cc.includes("HY") && !cc.includes("J") && !cc.includes("M");
-        return cc === pref;
-      });
+      const match = candidates.filter(r => fallbackMatch(r.class_code.toUpperCase().slice(1), pref));
       if (match.length > 0) {
         filtered = match;
         break;
@@ -74,7 +76,6 @@ export default async function handler(req, res) {
     }
     candidates = filtered;
 
-    // Apply sorting if there are multiple yield types (e.g., for color sets)
     const uniqueYields = new Set(candidates.map(r => r.class_code.toUpperCase().slice(1)));
     if (uniqueYields.size > 1) {
       candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code));
@@ -105,3 +106,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'CSV fetch or parse failed' });
   }
 }
+
