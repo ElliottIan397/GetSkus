@@ -1,7 +1,7 @@
-// Revision: v1.3.7
+// Revision: v1.3.9
 // CHANGELOG:
-// - Enforced strict fallback sequence by breaking at first match
-// - Ensured yield fallback does not override preference order by post-sort
+// - Re-introduced conditional yield-based sorting for color cartridge handling
+// - Preserves fallback priority when yield type is unambiguous
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -74,7 +74,11 @@ export default async function handler(req, res) {
     }
     candidates = filtered;
 
-    candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code));
+    // Apply sorting if there are multiple yield types (e.g., for color sets)
+    const uniqueYields = new Set(candidates.map(r => r.class_code.toUpperCase().slice(1)));
+    if (uniqueYields.size > 1) {
+      candidates.sort((a, b) => getYieldRank(b.class_code) - getYieldRank(a.class_code));
+    }
 
     const blackSku = sku_list[0];
     if ((PrintVolume === 'low' || PrintVolume === 'medium') && candidates.some(c => c.sku === blackSku)) {
