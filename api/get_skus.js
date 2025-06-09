@@ -1,7 +1,7 @@
-// Revision: v1.3.6
+// Revision: v1.3.7
 // CHANGELOG:
-// - Implemented fallback logic for yield class filtering based on PrintVolume and MICR
-// - Preserved color cartridge handling and black SKU prioritization
+// - Enforced strict fallback sequence by breaking at first match
+// - Ensured yield fallback does not override preference order by post-sort
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -39,14 +39,12 @@ export default async function handler(req, res) {
       return 0;
     };
 
-    // Apply MICR filter
     const isMicr = micr === 'MICR';
     candidates = candidates.filter(r =>
       isMicr ? r.class_code.toUpperCase().includes('M') :
                !r.class_code.toUpperCase().includes('M')
     );
 
-    // Fallback yield preference map
     const fallbackMap = {
       "low|":      ["", "J", "HY", "HYJ"],
       "med|":      ["J", "HY", "", "HYJ"],
@@ -61,11 +59,15 @@ export default async function handler(req, res) {
 
     let filtered = [];
     for (const pref of preferences) {
-      filtered = candidates.filter(r => {
+      const match = candidates.filter(r => {
         const cc = r.class_code.toUpperCase().slice(1);
+        if (pref === "") return !cc.includes("HY") && !cc.includes("J") && !cc.includes("M");
         return cc === pref;
       });
-      if (filtered.length > 0) break;
+      if (match.length > 0) {
+        filtered = match;
+        break;
+      }
     }
     if (filtered.length === 0) {
       filtered = candidates;
@@ -99,4 +101,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'CSV fetch or parse failed' });
   }
 }
-
