@@ -1,8 +1,7 @@
-// Revision: v1.4.0
+// Revision: v1.4.1
 // CHANGELOG:
-// - Corrected fallback match logic to ensure exact preference match
-// - Prevented overmatching in fallback filtering
-// - Maintained yield-based sorting only when yield types differ
+// - Added debug logs inside fallback loop to trace matching logic
+// - Ensured fallback filtering halts at first matched yield group only
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -66,6 +65,7 @@ export default async function handler(req, res) {
     let filtered = [];
     for (const pref of preferences) {
       const match = candidates.filter(r => fallbackMatch(r.class_code.toUpperCase().slice(1), pref));
+      console.log(`Checking fallback pref '${pref}':`, match.map(m => m.sku));
       if (match.length > 0) {
         filtered = match;
         break;
@@ -106,4 +106,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'CSV fetch or parse failed' });
   }
 }
+
 
