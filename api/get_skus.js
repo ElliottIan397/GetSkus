@@ -1,7 +1,7 @@
-// Revision: v1.4.1
+// Revision: v1.4.3
 // CHANGELOG:
-// - Added debug logs inside fallback loop to trace matching logic
-// - Ensured fallback filtering halts at first matched yield group only
+// - Aligned fallbackMap keys to use 'medium' instead of 'med'
+// - Removed normalization logic; fallbackKey now matches exact Voiceflow input
 
 const CSV_URL = 'https://raw.githubusercontent.com/ElliottIan397/voiceflow2/main/VF_API_TestProject042925.csv';
 
@@ -46,12 +46,12 @@ export default async function handler(req, res) {
     );
 
     const fallbackMap = {
-      "low|":      ["", "J", "HY", "HYJ"],
-      "med|":      ["J", "HY", "", "HYJ"],
-      "high|":     ["HY", "HYJ", "J", ""],
-      "low|MICR":  ["M", "JM", "HYM", "HYJM"],
-      "med|MICR":  ["JM", "HYM", "HYJM", "M"],
-      "high|MICR": ["HYM", "HYJM", "JM", "M"]
+      "low|":         ["", "J", "HY", "HYJ"],
+      "medium|":      ["J", "HY", "", "HYJ"],
+      "high|":        ["HY", "HYJ", "J", ""],
+      "low|MICR":     ["M", "JM", "HYM", "HYJM"],
+      "medium|MICR":  ["JM", "HYM", "HYJM", "M"],
+      "high|MICR":    ["HYM", "HYJM", "JM", "M"]
     };
 
     const fallbackKey = `${PrintVolume}|${isMicr ? 'MICR' : ''}`;
@@ -106,5 +106,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'CSV fetch or parse failed' });
   }
 }
-
-
